@@ -29,11 +29,14 @@ internal static class Program
         var onlyInDir1 = CompareImages(images1, images2);
         var onlyInDir2 = CompareImages(images2, images1);
 
-        PrintMissingImages("Dir1", onlyInDir1);
-        PrintMissingImages("Dir2", onlyInDir2);
+        var onlyInDir1ValuePairs = onlyInDir1.ToList();
+        Console.WriteLine($"Only in dir 1: {onlyInDir1ValuePairs.Count}");
 
-        CombineAndSaveImages(onlyInDir1, Path.Combine(outputDirectory, "output1.png"));
-        CombineAndSaveImages(onlyInDir2, Path.Combine(outputDirectory, "output2.png"));
+        var onlyInDir2ValuePairs = onlyInDir2.ToList();
+        Console.WriteLine($"Only in dir 2: {onlyInDir2ValuePairs.Count}");
+        
+        CombineAndSaveImages(onlyInDir1ValuePairs, Path.Combine(outputDirectory, "output1.png"));
+        CombineAndSaveImages(onlyInDir2ValuePairs, Path.Combine(outputDirectory, "output2.png"));
 
         DisposeMatList(images1);
         DisposeMatList(images2);
@@ -78,19 +81,10 @@ internal static class Program
         return ImageProcessor.ProcessDirectory(directory);
     }
 
-    private static List<KeyValuePair<Mat, string>> CompareImages(IEnumerable<KeyValuePair<Mat, string>> images1,
+    private static IEnumerable<KeyValuePair<Mat, string>> CompareImages(IEnumerable<KeyValuePair<Mat, string>> images1,
         List<KeyValuePair<Mat, string>> images2)
     {
         return ImageComparator.Compare(images1, images2);
-    }
-
-    private static void PrintMissingImages(string dir, IEnumerable<KeyValuePair<Mat, string>> missingImages)
-    {
-        Console.WriteLine($"Only in {dir}:");
-        foreach (var missingImage in missingImages)
-        {
-            Console.WriteLine($"{missingImage.Key} in {missingImage.Value}");
-        }
     }
 
     private static void CombineAndSaveImages(IEnumerable<KeyValuePair<Mat, string>> images, string outputFile)

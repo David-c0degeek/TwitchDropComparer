@@ -54,7 +54,7 @@ internal static class ImageComparator
 
         // The images are considered similar if we have a substantial number of good matches
         // Adjust the threshold depending on your specific requirements.
-        return goodMatches.Count > 100;
+        return goodMatches.Count > 90;
     }
 
     
