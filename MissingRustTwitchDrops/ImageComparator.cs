@@ -8,18 +8,18 @@ namespace MissingRustTwitchDrops;
 
 internal static class ImageComparator
 {
-    public static List<KeyValuePair<Mat, string>> Compare(IEnumerable<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
+    public static IEnumerable<KeyValuePair<Mat, string>> Compare(IEnumerable<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
     {
         return (
                 from image1 in images1
                 let matchFound = images2
                     .Any(image2 =>
-                        CompareImagesUsingOrb(image1.Key, image2.Key))
+                        CompareImagesUsingOrb(ImageProcessor.FilterOutColors(image1.Key), ImageProcessor.FilterOutColors(image2.Key)))
                 where !matchFound
                 select image1)
             .ToList();
     }
-
+    
     private static bool CompareImagesUsingOrb(Mat img1, Mat img2)
     {
         var orbDetector = new ORB();
@@ -54,9 +54,8 @@ internal static class ImageComparator
 
         // The images are considered similar if we have a substantial number of good matches
         // Adjust the threshold depending on your specific requirements.
-        return goodMatches.Count > 90;
+        return goodMatches.Count > 12;
     }
-
     
     private static bool CompareImagesUsingSsim(Mat img1, Mat img2)
     {
@@ -88,6 +87,7 @@ internal static class ImageComparator
 
             // The SSIM index is a value between -1 and 1. Values closer to 1 mean more similarity.
             // adjust the threshold depending on your specific requirements.
+            //return ssimIndex > 0.75;
             return ssimIndex > 0.75;
         }
         catch (Exception ex)
@@ -96,5 +96,57 @@ internal static class ImageComparator
         }
 
         throw new Exception();
+    }
+
+    private static bool CompareImagesUsingMatchTemplate(Mat img1, Mat img2)
+    {
+        try
+        {
+            CvInvoke.Resize(img2, img2, img1.Size);
+            
+            var sourceImage = img1.ToImage<Gray, byte>();
+            var templateImage = img2.ToImage<Gray, byte>();
+            
+            var resultImage = sourceImage.MatchTemplate(templateImage, TemplateMatchingType.CcoeffNormed);
+
+            resultImage.MinMax(out _, out var maxValues, out _, out _);
+
+            var percentage = maxValues[0] * 100; //this will be percentage of difference of two images
+
+            return percentage > 30;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return false;
+        }
+        
+    }
+    
+    private static bool CompareImagesUsingAbsDiff(Mat img1, Mat img2)
+    {
+        try
+        {
+            CvInvoke.Resize(img2, img2, img1.Size);
+            
+            var sourceImage = img1.ToImage<Gray, byte>();
+            var templateImage = img2.ToImage<Gray, byte>();
+            
+            var resultImage = new Image<Gray, byte>(templateImage.Width, templateImage.Height);
+
+            CvInvoke.AbsDiff(sourceImage, templateImage, resultImage);
+
+            double diff = CvInvoke.CountNonZero(resultImage);
+
+            diff = diff / (templateImage.Width * templateImage.Height) * 100; // this will give you the difference in percentage
+
+            return diff > 30;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return false;
+        }
+        
     }
 }

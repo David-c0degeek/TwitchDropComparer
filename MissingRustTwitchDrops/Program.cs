@@ -24,7 +24,7 @@ internal static class Program
         Console.WriteLine($"Processing images in {directories[0]} and {directories[1]}...");
         var images1 = ProcessImagesInDirectory(directories[0]);
         var images2 = ProcessImagesInDirectory(directories[1]);
-
+        
         Console.WriteLine("Comparing images...");
         var onlyInDir1 = CompareImages(images1, images2);
         var onlyInDir2 = CompareImages(images2, images1);
@@ -41,7 +41,7 @@ internal static class Program
         DisposeMatList(images1);
         DisposeMatList(images2);
     }
-
+    
     private static void DisposeMatList(List<KeyValuePair<Mat, string>> images)
     {
         foreach (var kvp in images)
