@@ -20,7 +20,6 @@ internal static class Program
     private static void RunOptionsAndReturnExitCode(Options opts)
     {
         var imageProcessor = new ImageProcessor();
-        var imageComparator = new ImageComparator();
 
         var directories = GetDirectories(opts);
         var outputDirectory = GetOutputDirectory(opts);
@@ -30,14 +29,25 @@ internal static class Program
         var images2 = ProcessImagesInDirectory(imageProcessor, directories[1]);
 
         Console.WriteLine("Comparing images...");
-        var onlyInDir1 = CompareImages(imageComparator, images1, images2);
-        var onlyInDir2 = CompareImages(imageComparator, images2, images1);
+        var onlyInDir1 = CompareImages(images1, images2);
+        var onlyInDir2 = CompareImages(images2, images1);
 
         PrintMissingImages("Dir1", onlyInDir1);
         PrintMissingImages("Dir2", onlyInDir2);
 
         CombineAndSaveImages(onlyInDir1, Path.Combine(outputDirectory, "output1.png"));
         CombineAndSaveImages(onlyInDir2, Path.Combine(outputDirectory, "output2.png"));
+        
+        DisposeMatList(images1);
+        DisposeMatList(images2);
+    }
+    
+    private static void DisposeMatList(List<KeyValuePair<Mat, string>> images)
+    {
+        foreach (var kvp in images)
+        {
+            kvp.Key.Dispose();
+        }
     }
 
     private static void HandleParseError(IEnumerable<Error> errs)
@@ -68,10 +78,10 @@ internal static class Program
     private static List<KeyValuePair<Mat, string>> ProcessImagesInDirectory(ImageProcessor imageProcessor, string directory)
     {
         Console.WriteLine($"Processing images in {directory}...");
-        return imageProcessor.ProcessDirectory(directory);
+        return ImageProcessor.ProcessDirectory(directory);
     }
 
-    private static List<KeyValuePair<Mat, string>> CompareImages(ImageComparator imageComparator, List<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
+    private static List<KeyValuePair<Mat, string>> CompareImages(List<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
     {
         return ImageComparator.Compare(images1, images2);
     }
@@ -93,9 +103,16 @@ internal static class Program
 
     private static void CombineImages(IEnumerable<KeyValuePair<Mat, string>> images, string outputFile)
     {
+        var valuePairs = images.ToList();
+        if (!valuePairs.Any())
+        {
+            Console.WriteLine("No images to combine.");
+            return;
+        }
+        
         // Compute the total width and maximum height of the combined image
         int totalWidth = 0, maxHeight = 0;
-        var keyValuePairs = images.ToList();
+        var keyValuePairs = valuePairs.ToList();
         foreach (var image in keyValuePairs)
         {
             totalWidth += image.Key.Width;

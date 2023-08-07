@@ -1,46 +1,39 @@
 ﻿using Emgu.CV;
-using Emgu.CV.CvEnum;
-using Emgu.CV.Util;
+using System.Drawing;
 
 namespace MissingRustTwitchDrops;
 
 internal class ImageProcessor
 {
-    public List<KeyValuePair<Mat, string>> ProcessDirectory(string dir)
+    private const int GridWidth = 5;
+    private const int GridHeight = 5;
+
+    public static List<KeyValuePair<Mat, string>> ProcessDirectory(string dir)
     {
         var images = new List<KeyValuePair<Mat, string>>();
         foreach (var file in Directory.GetFiles(dir))
         {
-            images.AddRange(ExtractSmallerImages(file).Select(smallerImage => new KeyValuePair<Mat, string>(smallerImage, file)));
+            images.AddRange(ExtractGridImages(file).Select(gridImage => new KeyValuePair<Mat, string>(gridImage, file)));
         }
         return images;
     }
 
-    private static IEnumerable<Mat> ExtractSmallerImages(string file)
+    private static IEnumerable<Mat> ExtractGridImages(string file)
     {
-        using var src = new Mat(file, ImreadModes.Color);
-        using var gray = new Mat();
-        using var edges = new Mat();
+        using var image = new Mat(file);
 
-        // Convert to grayscale
-        CvInvoke.CvtColor(src, gray, ColorConversion.Bgr2Gray);
+        var cellWidth = image.Width / GridWidth;
+        var cellHeight = image.Height / GridHeight;
 
-        // Detect edges
-        CvInvoke.Canny(gray, edges, 50, 150);
-
-        // Find contours
-        using var contours = new VectorOfVectorOfPoint();
-        CvInvoke.FindContours(edges, contours, null, RetrType.List, ChainApproxMethod.ChainApproxSimple);
-
-        // Extract each contour (smaller image) as a separate Mat
-        for (var i = 0; i < contours.Size; i++)
+        for (var y = 0; y < GridHeight; y++)
         {
-            using var contour = new VectorOfPoint(contours[i].ToArray());
-            var boundingRect = CvInvoke.BoundingRectangle(contour);
-            using var smallerImg = new Mat(src, boundingRect);
+            for (var x = 0; x < GridWidth; x++)
+            {
+                var cellRect = new Rectangle(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                var cellImage = new Mat(image, cellRect);
 
-            yield return smallerImg;
+                yield return cellImage;
+            }
         }
     }
-
 }
