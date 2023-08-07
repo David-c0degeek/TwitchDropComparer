@@ -1,8 +1,6 @@
-﻿using System.Drawing;
-using System.Reflection;
+﻿using System.Reflection;
 using CommandLine;
 using Emgu.CV;
-using Emgu.CV.CvEnum;
 
 namespace MissingRustTwitchDrops;
 
@@ -10,7 +8,8 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
-        Environment.SetEnvironmentVariable("EMGU_CV_RUNTIME_DIR", Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
+        Environment.SetEnvironmentVariable("EMGU_CV_RUNTIME_DIR",
+            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
 
         Parser.Default.ParseArguments<Options>(args)
             .WithParsed(RunOptionsAndReturnExitCode)
@@ -19,14 +18,12 @@ internal static class Program
 
     private static void RunOptionsAndReturnExitCode(Options opts)
     {
-        var imageProcessor = new ImageProcessor();
-
         var directories = GetDirectories(opts);
         var outputDirectory = GetOutputDirectory(opts);
 
         Console.WriteLine($"Processing images in {directories[0]} and {directories[1]}...");
-        var images1 = ProcessImagesInDirectory(imageProcessor, directories[0]);
-        var images2 = ProcessImagesInDirectory(imageProcessor, directories[1]);
+        var images1 = ProcessImagesInDirectory(directories[0]);
+        var images2 = ProcessImagesInDirectory(directories[1]);
 
         Console.WriteLine("Comparing images...");
         var onlyInDir1 = CompareImages(images1, images2);
@@ -37,11 +34,11 @@ internal static class Program
 
         CombineAndSaveImages(onlyInDir1, Path.Combine(outputDirectory, "output1.png"));
         CombineAndSaveImages(onlyInDir2, Path.Combine(outputDirectory, "output2.png"));
-        
+
         DisposeMatList(images1);
         DisposeMatList(images2);
     }
-    
+
     private static void DisposeMatList(List<KeyValuePair<Mat, string>> images)
     {
         foreach (var kvp in images)
@@ -75,13 +72,14 @@ internal static class Program
         return opts.OutputDirectory ?? Directory.GetCurrentDirectory();
     }
 
-    private static List<KeyValuePair<Mat, string>> ProcessImagesInDirectory(ImageProcessor imageProcessor, string directory)
+    private static List<KeyValuePair<Mat, string>> ProcessImagesInDirectory(string directory)
     {
         Console.WriteLine($"Processing images in {directory}...");
         return ImageProcessor.ProcessDirectory(directory);
     }
 
-    private static List<KeyValuePair<Mat, string>> CompareImages(List<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
+    private static List<KeyValuePair<Mat, string>> CompareImages(IEnumerable<KeyValuePair<Mat, string>> images1,
+        List<KeyValuePair<Mat, string>> images2)
     {
         return ImageComparator.Compare(images1, images2);
     }
@@ -103,35 +101,52 @@ internal static class Program
 
     private static void CombineImages(IEnumerable<KeyValuePair<Mat, string>> images, string outputFile)
     {
-        var valuePairs = images.ToList();
-        if (!valuePairs.Any())
+        var imageList = images.Select(x => x.Key).ToList();
+
+        if (!imageList.Any())
         {
             Console.WriteLine("No images to combine.");
             return;
         }
-        
-        // Compute the total width and maximum height of the combined image
-        int totalWidth = 0, maxHeight = 0;
-        var keyValuePairs = valuePairs.ToList();
-        foreach (var image in keyValuePairs)
+
+        var imageCount = imageList.Count;
+        var gridSize = (int)Math.Ceiling(Math.Sqrt(imageCount));
+
+        var rows = new List<Mat>();
+        for (var i = 0; i < gridSize; i++)
         {
-            totalWidth += image.Key.Width;
-            maxHeight = Math.Max(maxHeight, image.Key.Height);
+            var rowImages = new List<Mat>();
+            for (var j = 0; j < gridSize; j++)
+            {
+                var index = i * gridSize + j;
+                var img = index < imageCount
+                    ? imageList[index]
+                    : // If there aren't enough images to fill the grid, fill the rest with blank images
+                    Mat.Zeros(imageList[0].Size.Height, imageList[0].Size.Width, imageList[0].Depth,
+                        imageList[0].NumberOfChannels);
+                
+                // resize the image to match the first image size
+                CvInvoke.Resize(img, img, imageList[0].Size);
+                
+                rowImages.Add(img);
+            }
+
+            // Concatenate the images in the row horizontally
+            var row = new Mat();
+            CvInvoke.HConcat(rowImages.ToArray(), row);
+            rows.Add(row);
         }
 
-        // Create a new image with the computed size
-        var combinedImage = new Mat(maxHeight, totalWidth, DepthType.Cv8U, 3);
-
-        // Copy each image into the combined image
-        var currentX = 0;
-        foreach (var image in keyValuePairs)
-        {
-            var roi = new Mat(combinedImage, new Rectangle(new Point(currentX, 0), image.Key.Size));
-            image.Key.CopyTo(roi);
-            currentX += image.Key.Width;
-        }
+        // Concatenate the rows vertically to get the final image
+        var grid = new Mat();
+        CvInvoke.VConcat(rows.ToArray(), grid);
 
         // Save the combined image
-        combinedImage.Save(outputFile);
+        Console.WriteLine($"Saving combined image to {outputFile}...");
+        
+        if(File.Exists(outputFile))
+            File.Delete(outputFile);
+        
+        grid.Save(outputFile);
     }
 }

@@ -3,7 +3,7 @@ using System.Drawing;
 
 namespace MissingRustTwitchDrops;
 
-internal class ImageProcessor
+internal static class ImageProcessor
 {
     private const int GridWidth = 5;
     private const int GridHeight = 5;
