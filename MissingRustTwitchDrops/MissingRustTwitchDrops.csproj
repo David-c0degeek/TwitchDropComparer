@@ -12,6 +12,7 @@
     <ItemGroup>
       <PackageReference Include="CommandLineParser" Version="2.9.1" />
       <PackageReference Include="Emgu.CV" Version="4.7.0.5276" />
+      <PackageReference Include="Emgu.CV.runtime.windows" Version="4.7.0.5276" />
     </ItemGroup>
 
 </Project>

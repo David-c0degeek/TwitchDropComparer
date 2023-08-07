@@ -73,7 +73,7 @@ internal static class Program
 
     private static List<KeyValuePair<Mat, string>> CompareImages(ImageComparator imageComparator, List<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
     {
-        return imageComparator.Compare(images1, images2);
+        return ImageComparator.Compare(images1, images2);
     }
 
     private static void PrintMissingImages(string dir, IEnumerable<KeyValuePair<Mat, string>> missingImages)
