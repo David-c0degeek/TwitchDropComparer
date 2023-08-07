@@ -1,4 +1,5 @@
 ﻿using System.Drawing;
+using CommandLine;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 
@@ -6,28 +7,70 @@ namespace MissingRustTwitchDrops;
 
 internal static class Program
 {
-    private static void Main()
+    private static void Main(string[] args)
+    {
+        Parser.Default.ParseArguments<Options>(args)
+            .WithParsed(RunOptionsAndReturnExitCode)
+            .WithNotParsed(HandleParseError);
+    }
+
+    private static void RunOptionsAndReturnExitCode(Options opts)
     {
         var imageProcessor = new ImageProcessor();
         var imageComparator = new ImageComparator();
 
-        // Directory paths
-        var dir1 = "/path/to/dir1";
-        var dir2 = "/path/to/dir2";
+        var directories = GetDirectories(opts);
+        var outputDirectory = GetOutputDirectory(opts);
 
-        // Extract smaller images from larger images and compute their descriptors
-        var images1 = imageProcessor.ProcessDirectory(dir1);
-        var images2 = imageProcessor.ProcessDirectory(dir2);
+        Console.WriteLine($"Processing images in {directories[0]} and {directories[1]}...");
+        var images1 = ProcessImagesInDirectory(imageProcessor, directories[0]);
+        var images2 = ProcessImagesInDirectory(imageProcessor, directories[1]);
 
-        // Compare the descriptors to find images that are only in one directory
-        var onlyInDir1 = imageComparator.Compare(images1, images2);
-        var onlyInDir2 = imageComparator.Compare(images2, images1);
+        Console.WriteLine("Comparing images...");
+        var onlyInDir1 = CompareImages(imageComparator, images1, images2);
+        var onlyInDir2 = CompareImages(imageComparator, images2, images1);
 
         PrintMissingImages("Dir1", onlyInDir1);
         PrintMissingImages("Dir2", onlyInDir2);
 
-        CombineImages(onlyInDir1, "/path/to/output1.png");
-        CombineImages(onlyInDir2, "/path/to/output2.png");
+        CombineAndSaveImages(onlyInDir1, Path.Combine(outputDirectory, "output1.png"));
+        CombineAndSaveImages(onlyInDir2, Path.Combine(outputDirectory, "output2.png"));
+    }
+
+    private static void HandleParseError(IEnumerable<Error> errs)
+    {
+        Console.WriteLine("Failed to parse command line arguments:");
+        foreach (var err in errs)
+        {
+            Console.WriteLine(err);
+        }
+    }
+
+    private static List<string> GetDirectories(Options opts)
+    {
+        var directories = opts.Directories?.ToList();
+        if (directories?.Count < 2)
+        {
+            directories = Directory.GetDirectories(Directory.GetCurrentDirectory()).Take(2).ToList();
+        }
+
+        return directories!;
+    }
+
+    private static string GetOutputDirectory(Options opts)
+    {
+        return opts.OutputDirectory ?? Directory.GetCurrentDirectory();
+    }
+
+    private static List<KeyValuePair<Mat, string>> ProcessImagesInDirectory(ImageProcessor imageProcessor, string directory)
+    {
+        Console.WriteLine($"Processing images in {directory}...");
+        return imageProcessor.ProcessDirectory(directory);
+    }
+
+    private static List<KeyValuePair<Mat, string>> CompareImages(ImageComparator imageComparator, List<KeyValuePair<Mat, string>> images1, List<KeyValuePair<Mat, string>> images2)
+    {
+        return imageComparator.Compare(images1, images2);
     }
 
     private static void PrintMissingImages(string dir, IEnumerable<KeyValuePair<Mat, string>> missingImages)
@@ -39,11 +82,18 @@ internal static class Program
         }
     }
 
+    private static void CombineAndSaveImages(IEnumerable<KeyValuePair<Mat, string>> images, string outputFile)
+    {
+        Console.WriteLine($"Combining images and saving to {outputFile}...");
+        CombineImages(images, outputFile);
+    }
+
     private static void CombineImages(IEnumerable<KeyValuePair<Mat, string>> images, string outputFile)
     {
         // Compute the total width and maximum height of the combined image
         int totalWidth = 0, maxHeight = 0;
-        foreach (var image in images)
+        var keyValuePairs = images.ToList();
+        foreach (var image in keyValuePairs)
         {
             totalWidth += image.Key.Width;
             maxHeight = Math.Max(maxHeight, image.Key.Height);
@@ -54,7 +104,7 @@ internal static class Program
 
         // Copy each image into the combined image
         var currentX = 0;
-        foreach (var image in images)
+        foreach (var image in keyValuePairs)
         {
             var roi = new Mat(combinedImage, new Rectangle(new Point(currentX, 0), image.Key.Size));
             image.Key.CopyTo(roi);
