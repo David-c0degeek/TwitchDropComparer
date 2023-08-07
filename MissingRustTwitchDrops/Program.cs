@@ -1,4 +1,5 @@
 ﻿using System.Drawing;
+using System.Reflection;
 using CommandLine;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
@@ -9,6 +10,8 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
+        Environment.SetEnvironmentVariable("EMGU_CV_RUNTIME_DIR", Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
+
         Parser.Default.ParseArguments<Options>(args)
             .WithParsed(RunOptionsAndReturnExitCode)
             .WithNotParsed(HandleParseError);
