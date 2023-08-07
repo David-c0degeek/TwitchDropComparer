@@ -54,7 +54,7 @@ internal static class ImageComparator
 
         // The images are considered similar if we have a substantial number of good matches
         // Adjust the threshold depending on your specific requirements.
-        return goodMatches.Count > 12;
+        return goodMatches.Count > 25;
     }
     
     private static bool CompareImagesUsingSsim(Mat img1, Mat img2)
